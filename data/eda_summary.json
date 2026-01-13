@@ -1,0 +1,38 @@
+{
+  "dataset_info": {
+    "total_samples": 21214,
+    "total_features": 31,
+    "features_numeric": 22,
+    "features_non_numeric": 9
+  },
+  "class_distribution": {
+    "class_0_goodware": 21116,
+    "class_0_percent": 99.54,
+    "class_1_malware": 98,
+    "class_1_percent": 0.46
+  },
+  "data_quality": {
+    "missing_values_total": 51605,
+    "duplicate_rows": 6,
+    "duplicate_percent": 0.03,
+    "constant_features": 3
+  },
+  "train_test_split": {
+    "random_seed": 42,
+    "train_samples": 16971,
+    "train_percent": 80,
+    "test_samples": 4243,
+    "test_percent": 20,
+    "train_class_0": 16893,
+    "train_class_1": 78,
+    "test_class_0": 4223,
+    "test_class_1": 20
+  },
+  "recommendations": [
+    "Remove constant features before modeling",
+    "Handle missing values in Identify column",
+    "Consider removing duplicate rows",
+    "Use stratified cross-validation (already done in train/test split)",
+    "Apply preprocessing (scaling, encoding) only on training data"
+  ]
+}
