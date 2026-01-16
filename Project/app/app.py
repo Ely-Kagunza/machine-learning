@@ -10,7 +10,9 @@ import pandas as pd
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix
 import random
+from io import StringIO
 
 # ============================================================================
 # CONFIGURATION
@@ -139,11 +141,6 @@ def load_sample_data_from_file(sample_type='goodware'):
             if feature not in sample:
                 sample[feature] = 0.0
         
-        # Debug: Print what we got
-        print(f"\n[DEBUG] Sample type: {sample_type}")
-        print(f"[DEBUG] Features in sample before conversion: {list(sample.keys())}")
-        print(f"[DEBUG] Categorical features: {CATEGORICAL_FEATURES}")
-        
         # Convert all values to proper numeric format for JSON serialization
         result_sample = {}
         for feature in FEATURE_NAMES:
@@ -158,8 +155,6 @@ def load_sample_data_from_file(sample_type='goodware'):
                     result_sample[feature] = float(value)
             except (ValueError, TypeError):
                 result_sample[feature] = 0
-        
-        print(f"[DEBUG] Categorical values (final): {[(k, result_sample[k]) for k in CATEGORICAL_FEATURES if k in result_sample]}\n")
         
         return {
             'sample': result_sample,
@@ -187,14 +182,8 @@ def preprocess_input(data_dict):
         # Create DataFrame with proper feature order
         df = pd.DataFrame([data_dict], columns=FEATURE_NAMES)
         
-        print(f"[DEBUG] DataFrame shape: {df.shape}")
-        print(f"[DEBUG] DataFrame columns: {list(df.columns)}")
-        print(f"[DEBUG] First few values: {df.iloc[0, :5].to_dict()}")
-        
         # Apply preprocessing
         X_processed = PREPROCESSOR.transform(df)
-        
-        print(f"[DEBUG] Processed shape: {X_processed.shape}")
         
         return X_processed
     
@@ -312,6 +301,116 @@ def get_sample(sample_type):
         return jsonify(result), 500
     
     return jsonify(result), 200
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    """
+    Handle CSV file upload for batch predictions
+    CSV should contain feature columns matching FEATURE_NAMES
+    Optional: Include 'Label' column for metrics calculation
+    """
+    try:
+        # Check if file is present
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'Only CSV files are supported'}), 400
+        
+        # Read CSV
+        try:
+            stream = StringIO(file.stream.read().decode('utf8'), newline=None)
+            df = pd.read_csv(stream)
+        except Exception as e:
+            return jsonify({'error': f'Failed to parse CSV: {str(e)}'}), 400
+        
+        # Check for required features
+        missing_features = [f for f in FEATURE_NAMES if f not in df.columns]
+        if missing_features:
+            return jsonify({'error': f'Missing features in CSV: {missing_features[:5]}...'}), 400
+        
+        # Extract features
+        X_upload = df[FEATURE_NAMES].copy()
+        
+        # Check for missing values in features
+        if X_upload.isnull().any().any():
+            return jsonify({'error': 'CSV contains missing values in feature columns'}), 400
+        
+        # Preprocess data
+        try:
+            X_processed = PREPROCESSOR.transform(X_upload)
+        except Exception as e:
+            return jsonify({'error': f'Preprocessing failed: {str(e)}'}), 400
+        
+        # Make predictions
+        try:
+            y_pred = MODEL.predict(pd.DataFrame(X_processed, columns=FEATURE_NAMES))
+            y_pred_proba = MODEL.predict_proba(pd.DataFrame(X_processed, columns=FEATURE_NAMES))
+        except Exception as e:
+            return jsonify({'error': f'Prediction failed: {str(e)}'}), 400
+        
+        # Prepare response
+        predictions = []
+        for i, (pred, proba) in enumerate(zip(y_pred, y_pred_proba)):
+            predictions.append({
+                'row': i + 1,
+                'prediction': int(pred),
+                'class': 'Malware' if pred == 1 else 'Goodware',
+                'goodware_prob': float(proba[0] * 100),
+                'malware_prob': float(proba[1] * 100),
+                'confidence': float(max(proba) * 100)
+            })
+        
+        response = {
+            'total_predictions': len(predictions),
+            'predictions': predictions,
+            'malware_count': int(sum(y_pred)),
+            'goodware_count': int(len(y_pred) - sum(y_pred))
+        }
+        
+        # Calculate metrics if labels are provided
+        if 'Label' in df.columns:
+            try:
+                y_true = df['Label'].values
+                
+                # Validate labels
+                if not all(label in [0, 1] for label in y_true):
+                    return jsonify({'error': 'Label column must contain only 0 (goodware) or 1 (malware)'}), 400
+                
+                # Calculate metrics
+                auc = roc_auc_score(y_true, y_pred_proba[:, 1])
+                accuracy = accuracy_score(y_true, y_pred)
+                conf_matrix = confusion_matrix(y_true, y_pred).tolist()
+                
+                # Unpack confusion matrix
+                tn, fp, fn, tp = conf_matrix[0][0], conf_matrix[0][1], conf_matrix[1][0], conf_matrix[1][1]
+                
+                response['metrics'] = {
+                    'auc': float(auc),
+                    'accuracy': float(accuracy),
+                    'confusion_matrix': {
+                        'true_negatives': int(tn),
+                        'false_positives': int(fp),
+                        'false_negatives': int(fn),
+                        'true_positives': int(tp)
+                    },
+                    'precision': float(tp / (tp + fp)) if (tp + fp) > 0 else 0,
+                    'recall': float(tp / (tp + fn)) if (tp + fn) > 0 else 0,
+                    'f1': float(2 * tp / (2 * tp + fp + fn)) if (2 * tp + fp + fn) > 0 else 0
+                }
+            except Exception as e:
+                # Don't fail if metrics can't be calculated, just skip them
+                pass
+        
+        return jsonify(response), 200
+    
+    except Exception as e:
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/api/model-info', methods=['GET'])
 def model_info():

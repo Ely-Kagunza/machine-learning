@@ -45,6 +45,11 @@
                             <h4 id="classification" class="alert-heading"></h4>
                             <p><strong>Status:</strong> <span id="status"></span></p>
                             <p><strong>Confidence:</strong> <span id="confidence"></span></p>
+                            <div id="confidence-bar-container" style="margin: 1rem 0;">
+                                <div style="background: #e5e7eb; border-radius: 8px; height: 28px; overflow: hidden;">
+                                    <div id="confidence-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #16a34a, #14b8a6); transition: width 0.4s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.85rem;"></div>
+                                </div>
+                            </div>
                             <hr>
                             <p class="mb-0"><strong>Probability Scores:</strong></p>
                             <p>Goodware: <span id="prob-goodware" class="badge bg-info"></span></p>
@@ -93,13 +98,127 @@
                             <button type="button" class="btn btn-outline-danger" id="load-malware-btn">
                                 🎲 Load Random Sample (Goodware or Malware)
                             </button>
-                            <!-- <button type="button" class="btn btn-outline-primary" id="load-random-btn">
-                                🎲 Load Random Sample (Goodware or Malware)
-                            </button> -->
                         </div>
                         <p class="text-muted mt-3 mb-0">
                             <small>Click any button to auto-fill the form with real training data for testing.</small>
                         </p>
+                    </div>
+                </div>
+
+                <!-- File Upload Section -->
+                <div class="card mt-4 shadow-sm">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">📤 Batch Predictions</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3"><strong>Upload CSV file for batch analysis:</strong></p>
+                        <form id="upload-form" enctype="multipart/form-data">
+                            <div class="input-group mb-3">
+                                <input type="file" class="form-control" id="csv-file" accept=".csv" required>
+                                <button class="btn btn-warning" type="submit">Upload & Predict</button>
+                            </div>
+                        </form>
+                        <p class="text-muted mb-0">
+                            <small>CSV should contain all 26 features. Optional: Include "Label" column (0=goodware, 1=malware) for metrics.</small>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Batch Results Card -->
+                <div class="card mt-4 shadow-sm" id="batch-results-card" style="display: none;">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">📊 Batch Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="alert alert-info mb-0">
+                                    <strong>Total Predictions:</strong> <span id="total-predictions">-</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="alert alert-success mb-0">
+                                    <strong>Goodware:</strong> <span id="goodware-count">-</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="alert alert-danger mb-0">
+                                    <strong>Malware:</strong> <span id="malware-count">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Metrics if labels provided -->
+                        <div id="metrics-section" style="display: none;">
+                            <hr>
+                            <h6 class="mb-3">📈 Model Evaluation Metrics</h6>
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <div class="alert alert-primary mb-0">
+                                        <strong>AUC:</strong> <span id="metric-auc">-</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="alert alert-primary mb-0">
+                                        <strong>Accuracy:</strong> <span id="metric-accuracy">-</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="alert alert-primary mb-0">
+                                        <strong>Precision:</strong> <span id="metric-precision">-</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="alert alert-primary mb-0">
+                                        <strong>Recall:</strong> <span id="metric-recall">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Confusion Matrix -->
+                            <h6 class="mb-2">Confusion Matrix</h6>
+                            <table class="table table-bordered table-sm" style="max-width: 300px;">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th class="text-center">Predicted Goodware</th>
+                                        <th class="text-center">Predicted Malware</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th>Actual Goodware</th>
+                                        <td class="text-center"><span id="cm-tn">-</span></td>
+                                        <td class="text-center"><span id="cm-fp">-</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Actual Malware</th>
+                                        <td class="text-center"><span id="cm-fn">-</span></td>
+                                        <td class="text-center"><span id="cm-tp">-</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Predictions Table (scrollable) -->
+                        <hr>
+                        <h6 class="mb-3">📋 Detailed Predictions</h6>
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm table-striped" id="predictions-table">
+                                <thead>
+                                    <tr>
+                                        <th>Row</th>
+                                        <th>Prediction</th>
+                                        <th>Goodware %</th>
+                                        <th>Malware %</th>
+                                        <th>Confidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="predictions-tbody">
+                                    <!-- Will be populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -115,5 +234,6 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script src="{{ url_for('static', filename='upload.js') }}"></script>
 </body>
 </html>

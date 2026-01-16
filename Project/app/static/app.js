@@ -7,8 +7,6 @@ let categoricalFeatures = [];
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Loading malware detection app...');
-    
     // Fetch feature information
     fetchFeatures();
     
@@ -16,7 +14,18 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('prediction-form').addEventListener('submit', handlePrediction);
     document.getElementById('load-goodware-btn').addEventListener('click', () => loadSampleData('goodware'));
     document.getElementById('load-malware-btn').addEventListener('click', () => loadSampleData('malware'));
-    document.getElementById('load-random-btn').addEventListener('click', () => loadSampleData('random'));
+
+    // Attach upload handler if present
+    const uploadForm = document.getElementById('upload-form');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', handleFileUpload);
+    }
+    
+    // Only attach random button if it exists
+    const randomBtn = document.getElementById('load-random-btn');
+    if (randomBtn) {
+        randomBtn.addEventListener('click', () => loadSampleData('random'));
+    }
 });
 
 // Fetch features from API
@@ -28,13 +37,11 @@ function fetchFeatures() {
             numericFeatures = data.numeric_features;
             categoricalFeatures = data.categorical_features;
             
-            console.log(`Loaded ${features.length} features`);
             document.getElementById('feature-count').textContent = features.length;
             
             renderForm();
         })
         .catch(error => {
-            console.error('Error fetching features:', error);
             showAlert('Error loading features from API', 'danger');
         });
 }
@@ -123,12 +130,9 @@ function handlePrediction(event) {
     const formData = new FormData(document.getElementById('prediction-form'));
     const inputData = Object.fromEntries(formData);
     
-    console.log('Form data collected:', inputData);
-    
     // Validate all required features are present
     const missingFeatures = features.filter(f => !(f in inputData));
     if (missingFeatures.length > 0) {
-        console.warn('Missing features:', missingFeatures);
         showAlert(`❌ Please fill in all fields. Missing: ${missingFeatures.join(', ')}`, 'danger');
         submitBtn.disabled = false;
         submitText.textContent = '🔬 Analyze File';
@@ -144,8 +148,6 @@ function handlePrediction(event) {
             inputData[key] = parseInt(inputData[key]);
         }
     }
-    
-    console.log('Sending prediction request:', inputData);
     
     // Send prediction request
     fetch('/api/predict', {
@@ -164,12 +166,10 @@ function handlePrediction(event) {
         return response.json();
     })
     .then(result => {
-        console.log('Prediction result:', result);
         displayResult(result);
-        showAlert('✅ Prediction successful!', 'success');
+        showAlert('✅ Analysis complete!', 'success');
     })
     .catch(error => {
-        console.error('Prediction error:', error);
         showAlert(`❌ ${error.message}`, 'danger');
     })
     .finally(() => {
@@ -194,11 +194,17 @@ function displayResult(result) {
     // Update result content
     document.getElementById('classification').textContent = result.classification;
     document.getElementById('status').textContent = result.status;
-    document.getElementById('confidence').textContent = result.confidence.toFixed(2) + '%';
+    const confidence = result.confidence;
+    document.getElementById('confidence').textContent = confidence.toFixed(2) + '%';
     document.getElementById('prob-goodware').textContent = 
         (result.probability_goodware * 100).toFixed(2) + '%';
     document.getElementById('prob-malware').textContent = 
         (result.probability_malware * 100).toFixed(2) + '%';
+    
+    // Update confidence bar
+    const confidenceBar = document.getElementById('confidence-bar');
+    confidenceBar.style.width = confidence + '%';
+    confidenceBar.textContent = confidence.toFixed(1) + '%';
     
     // Show card
     card.style.display = 'block';
@@ -209,8 +215,6 @@ function displayResult(result) {
 
 // Load sample data
 function loadSampleData(sampleType) {
-    console.log(`Loading ${sampleType} sample data...`);
-    
     // Show loading state
     const btn = document.getElementById(`load-${sampleType}-btn`);
     const originalText = btn.innerHTML;
@@ -220,7 +224,6 @@ function loadSampleData(sampleType) {
     // Fetch sample data from API
     fetch(`/api/sample/${sampleType}`)
         .then(response => {
-            console.log('Response status:', response.status);
             if (!response.ok) {
                 return response.json().then(data => {
                     throw new Error(data.error || `Failed to load sample (Status: ${response.status})`);
@@ -229,13 +232,9 @@ function loadSampleData(sampleType) {
             return response.json();
         })
         .then(result => {
-            console.log('Sample data received:', result);
-            console.log('Sample keys:', Object.keys(result.sample));
-            
             // Fill form with sample data
             const sample = result.sample;
             let filledCount = 0;
-            let notFoundCount = 0;
             
             for (let [key, value] of Object.entries(sample)) {
                 const element = document.getElementById(key);
@@ -250,19 +249,13 @@ function loadSampleData(sampleType) {
                                 // For numeric fields, keep 2 decimal places
                                 element.value = parseFloat(value).toFixed(2);
                             }
-                            console.log(`Filled INPUT ${key}: ${element.value}`);
                         } else {
                             element.value = value;
                         }
                     }
                     filledCount++;
-                } else {
-                    notFoundCount++;
-                    console.warn(`Element not found for: ${key}`);
                 }
             }
-            
-            console.log(`Filled ${filledCount} fields, ${notFoundCount} not found`);
             
             // Scroll to form
             const formContainer = document.getElementById('features-container');
@@ -274,7 +267,6 @@ function loadSampleData(sampleType) {
             showAlert(`✓ ${result.sample_name} loaded (${filledCount}/${result.features} fields filled)`, 'success');
         })
         .catch(error => {
-            console.error('Error loading sample:', error);
             showAlert(`❌ Error: ${error.message}`, 'danger');
         })
         .finally(() => {
@@ -303,21 +295,3 @@ function showAlert(message, type = 'info') {
         alertDiv.remove();
     }, 5000);
 }
-
-// API Health Check
-function checkHealth() {
-    fetch('/health')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Health check:', data);
-            if (!data.model_loaded || !data.preprocessor_loaded) {
-                showAlert('⚠️ Warning: Model or preprocessor not loaded', 'warning');
-            }
-        })
-        .catch(error => {
-            console.error('Health check failed:', error);
-        });
-}
-
-// Check health on load
-window.addEventListener('load', checkHealth);
