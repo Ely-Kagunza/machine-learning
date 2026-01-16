@@ -111,28 +111,28 @@ def load_sample_data_from_file(sample_type='goodware'):
             sample_name = "Mean Goodware Sample"
             
         elif sample_type == 'malware':
-            # Mean values of malware (class 1)
-            malware_mask = y_train == 1
-            malware_samples = X_train_numeric[malware_mask]
-            # Use mean for numeric features
-            sample = malware_samples.mean().to_dict()
-            # For categorical features, use mode (most common value) instead of mean
+            # Use a REAL malware sample (random row) instead of class mean
+            malware_indices = y_train[y_train == 1].index.tolist()
+            random_idx = random.choice(malware_indices)
+            sample = X_train_numeric.loc[random_idx].to_dict()
+            # Ensure categorical features are ints
             for cat_feature in CATEGORICAL_FEATURES:
-                if cat_feature in malware_samples.columns:
-                    mode_val = malware_samples[cat_feature].mode()
-                    sample[cat_feature] = int(mode_val.iloc[0]) if len(mode_val) > 0 else 0
-            sample_name = "Mean Malware Sample"
+                if cat_feature in sample:
+                    sample[cat_feature] = int(sample[cat_feature])
+            sample_name = f"Random Malware Sample #{random_idx}"
             
         elif sample_type == 'random':
-            # Random goodware sample
-            goodware_indices = y_train[y_train == 0].index.tolist()
-            random_idx = random.choice(goodware_indices)
+            # Random sample across both classes
+            all_indices = y_train.index.tolist()
+            random_idx = random.choice(all_indices)
             sample = X_train_numeric.loc[random_idx].to_dict()
             # For categorical features, convert to int
             for cat_feature in CATEGORICAL_FEATURES:
                 if cat_feature in sample:
                     sample[cat_feature] = int(sample[cat_feature])
-            sample_name = f"Random Goodware Sample #{random_idx}"
+            label = int(y_train.loc[random_idx])
+            label_name = 'Goodware' if label == 0 else 'Malware'
+            sample_name = f"Random {label_name} Sample #{random_idx}"
         
         # Ensure all required features are present (fill missing with 0)
         for feature in FEATURE_NAMES:
@@ -212,11 +212,14 @@ def make_prediction(X_processed):
         Dictionary with prediction and probability
     """
     try:
+        # Wrap scaled features with column names to match training
+        X_df = pd.DataFrame(X_processed, columns=FEATURE_NAMES)
+
         # Get prediction
-        y_pred = MODEL.predict(X_processed)[0]
+        y_pred = MODEL.predict(X_df)[0]
         
         # Get prediction probability
-        y_proba = MODEL.predict_proba(X_processed)[0]
+        y_proba = MODEL.predict_proba(X_df)[0]
         
         return {
             'prediction': int(y_pred),
@@ -351,7 +354,7 @@ def server_error(error):
 
 if __name__ == '__main__':
     print("\n" + "="*80)
-    print("MALWARE DETECTION FLASK WEB APP - WEEK 3")
+    print("MALWARE DETECTION FLASK WEB APP STARTING")
     print("="*80)
     print(f"Model: LightGBM")
     print(f"CV AUC: 0.9957")

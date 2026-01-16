@@ -39,45 +39,36 @@ function fetchFeatures() {
         });
 }
 
-// Render form dynamically
+// Render form dynamically with a responsive grid
 function renderForm() {
     const container = document.getElementById('features-container');
     container.innerHTML = '';
-    
-    // Numeric features
+    container.className = 'features-grid';
+
+    // Numeric features header
     if (numericFeatures.length > 0) {
-        container.innerHTML += '<div class="col-12"><h6 class="feature-category">📊 Numeric Features</h6></div>';
-        
-        for (let i = 0; i < numericFeatures.length; i += 2) {
-            const col = document.createElement('div');
-            col.className = 'col-md-6';
-            
-            col.innerHTML += createInputField(numericFeatures[i], 'number');
-            
-            if (i + 1 < numericFeatures.length) {
-                col.innerHTML += createInputField(numericFeatures[i + 1], 'number');
-            }
-            
-            container.appendChild(col);
-        }
+        const header = document.createElement('div');
+        header.innerHTML = '<h6 class="feature-category">📊 Numeric Features</h6>';
+        container.appendChild(header);
+
+        numericFeatures.forEach((feat) => {
+            const item = document.createElement('div');
+            item.innerHTML = createInputField(feat, 'number');
+            container.appendChild(item);
+        });
     }
-    
-    // Categorical features
+
+    // Categorical features header
     if (categoricalFeatures.length > 0) {
-        container.innerHTML += '<div class="col-12"><h6 class="feature-category">🏷️ Categorical Features</h6></div>';
-        
-        for (let i = 0; i < categoricalFeatures.length; i += 2) {
-            const col = document.createElement('div');
-            col.className = 'col-md-6';
-            
-            col.innerHTML += createSelectField(categoricalFeatures[i]);
-            
-            if (i + 1 < categoricalFeatures.length) {
-                col.innerHTML += createSelectField(categoricalFeatures[i + 1]);
-            }
-            
-            container.appendChild(col);
-        }
+        const header = document.createElement('div');
+        header.innerHTML = '<h6 class="feature-category">🏷️ Categorical Features</h6>';
+        container.appendChild(header);
+
+        categoricalFeatures.forEach((feat) => {
+            const item = document.createElement('div');
+            item.innerHTML = createSelectField(feat);
+            container.appendChild(item);
+        });
     }
 }
 

@@ -393,7 +393,7 @@ def main():
     trainer.create_comparison_plot()
     
     print("\n" + "="*80)
-    print("TRAINING COMPLETE - READY FOR WEEK 3 (FLASK APP)")
+    print("TRAINING COMPLETE")
     print("="*80)
     print(f"\nBest Model: {trainer.best_model_name}")
     print(f"CV AUC: {trainer.best_auc:.4f}")
