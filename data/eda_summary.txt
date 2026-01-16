@@ -1,0 +1,55 @@
+================================================================================
+EXPLORATORY DATA ANALYSIS SUMMARY
+Brazilian Malware Dataset
+================================================================================
+
+DATASET OVERVIEW:
+  Total Samples: 50,181
+  Total Features: 27
+  Shape: (50181, 28)
+
+TARGET DISTRIBUTION:
+  Class 0 (Goodware): 21,116 (42.08%)
+  Class 1 (Malware): 29,065 (57.92%)
+
+MISSING DATA:
+  Total Missing Values: 14,223
+    Identify: 14,223
+
+DUPLICATES:
+  Duplicate Rows: 2,480
+
+DATA TYPES:
+  int64: 22 columns
+  object: 5 columns
+  float64: 1 columns
+
+FEATURE NAMES:
+  - BaseOfCode
+  - BaseOfData
+  - Characteristics
+  - DllCharacteristics
+  - Entropy
+  - FileAlignment
+  - FirstSeenDate
+  - Identify
+  - ImageBase
+  - ImportedDlls
+  - ImportedSymbols
+  - Label
+  - Machine
+  - Magic
+  - NumberOfRvaAndSizes
+  - NumberOfSections
+  - NumberOfSymbols
+  - PE_TYPE
+  - PointerToSymbolTable
+  - SHA1
+  - Size
+  - SizeOfCode
+  - SizeOfHeaders
+  - SizeOfImage
+  - SizeOfInitializedData
+  - SizeOfOptionalHeader
+  - SizeOfUninitializedData
+  - TimeDateStamp

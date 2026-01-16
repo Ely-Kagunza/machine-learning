@@ -1,195 +1,271 @@
+"""
+Exploratory Data Analysis for Brazilian Malware Dataset
+Generates comprehensive analysis and visualizations
+"""
+
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from pathlib import Path
-import json
-from sklearn.model_selection import train_test_split
+import warnings
+warnings.filterwarnings('ignore')
 
-print("\n" + "="*80)
-print("BRAZILIAN MALWARE DATASET - EXPLORATORY DATA ANALYSIS")
-print("="*80)
+# Set visualization style
+sns.set_style("whitegrid")
+plt.rcParams['figure.figsize'] = (12, 8)
 
-# Define paths
-base_path = Path(__file__).parent
-data_path = base_path / "brazilian-malware-dataset"
-goodware_path = data_path / "goodware-malware" / "goodware.csv"
-malware_dir = data_path / "goodware-malware" / "malware-by-day"
-output_dir = base_path / "data"
-output_dir.mkdir(exist_ok=True)
-
-# STEP 1: Load goodware and combine with malware
-print("\n[STEP 1] Loading datasets...")
-try:
-    goodware = pd.read_csv(goodware_path)
-    print(f"  - Goodware samples: {len(goodware)}")
-    goodware['Label'] = 0  # 0 = goodware
-except Exception as e:
-    print(f"  ERROR loading goodware: {e}")
-    exit(1)
-
-# Load first malware file to get schema
-malware_files = sorted(list(malware_dir.glob("*.csv")))
-print(f"  - Found {len(malware_files)} malware daily files")
-
-malware_list = []
-for mfile in malware_files[:5]:  # Load first 5 for testing
-    try:
-        m = pd.read_csv(mfile)
-        m['Label'] = 1  # 1 = malware
-        malware_list.append(m)
-    except Exception as e:
-        print(f"    WARNING: Could not load {mfile.name}: {e}")
-
-if malware_list:
-    malware = pd.concat(malware_list, ignore_index=True)
-    print(f"  - Malware samples loaded: {len(malware)}")
-else:
-    print("  ERROR: No malware files loaded")
-    exit(1)
-
-# Combine datasets
-df = pd.concat([goodware, malware], ignore_index=True)
-print(f"\n[STEP 2] Combined dataset shape: {df.shape}")
-print(f"  - Rows: {df.shape[0]}, Columns: {df.shape[1]}")
-
-# STEP 3: Target variable analysis
-print("\n[STEP 3] Target variable distribution:")
-class_counts = df['Label'].value_counts().sort_index()
-class_pcts = (class_counts / len(df) * 100).round(2)
-for label, count in class_counts.items():
-    pct = class_pcts[label]
-    label_name = "Goodware" if label == 0 else "Malware"
-    print(f"  - Class {label} ({label_name}): {count} samples ({pct}%)")
-
-# STEP 4: Missing data analysis
-print("\n[STEP 4] Missing data analysis:")
-missing = df.isnull().sum()
-missing_pct = (missing / len(df) * 100).round(2)
-missing_cols = missing[missing > 0].sort_values(ascending=False)
-if len(missing_cols) > 0:
-    for col_name in missing_cols.head(10).index:
-        print(f"  - {col_name}: {missing[col_name]} missing ({missing_pct[col_name]}%)")
-else:
-    print("  - No missing values detected")
-
-# STEP 5: Duplicate rows
-print("\n[STEP 5] Duplicate analysis:")
-duplicates = df.duplicated().sum()
-dup_pct = (duplicates / len(df) * 100).round(2)
-print(f"  - Duplicate rows: {duplicates} ({dup_pct}%)")
-
-# STEP 6: Data types
-print("\n[STEP 6] Data type summary:")
-dtypes_summary = df.dtypes.value_counts()
-for dtype, count in dtypes_summary.items():
-    print(f"  - {dtype}: {count} columns")
-
-# STEP 7: Feature variance analysis
-print("\n[STEP 7] Feature variance analysis:")
-numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-if 'Label' in numeric_cols:
-    numeric_cols.remove('Label')
-
-print(f"  - Numeric features: {len(numeric_cols)}")
-if numeric_cols:
-    variances = df[numeric_cols].var()
-    low_var = variances[variances == 0]
-    if len(low_var) > 0:
-        print(f"  - Constant features (variance=0): {len(low_var)}")
-        for col in low_var.index[:5]:
-            print(f"    * {col}")
-    else:
-        print(f"  - No constant features detected")
-
-# STEP 8: Correlation analysis
-print("\n[STEP 8] Correlation analysis:")
-if len(numeric_cols) > 1:
-    corr_matrix = df[numeric_cols].corr()
-    # Find highly correlated pairs
-    high_corr_pairs = []
-    for i in range(len(corr_matrix.columns)):
-        for j in range(i+1, len(corr_matrix.columns)):
-            if abs(corr_matrix.iloc[i, j]) > 0.95:
-                high_corr_pairs.append((corr_matrix.columns[i], corr_matrix.columns[j], corr_matrix.iloc[i, j]))
+def load_data():
+    """Load the Brazilian malware dataset"""
+    print("\n" + "="*80)
+    print("EXPLORATORY DATA ANALYSIS - BRAZILIAN MALWARE DATASET")
+    print("="*80)
     
-    if high_corr_pairs:
-        print(f"  - Highly correlated pairs (>0.95): {len(high_corr_pairs)}")
-        for col1, col2, corr in high_corr_pairs[:5]:
-            print(f"    * {col1} <-> {col2}: {corr:.4f}")
+    # Load data
+    data_path = Path("brazilian-malware-dataset/brazilian-malware/brazilian-malware.csv")
+    print(f"\n[1] Loading data from: {data_path}")
+    
+    df = pd.read_csv(data_path)
+    print(f"    Dataset shape: {df.shape}")
+    print(f"    Rows: {df.shape[0]:,}, Columns: {df.shape[1]}")
+    
+    return df
+
+def analyze_target_distribution(df):
+    """Analyze target variable distribution"""
+    print("\n[2] Target Variable Analysis:")
+    
+    if 'Label' in df.columns:
+        target_counts = df['Label'].value_counts().sort_index()
+        target_pcts = (target_counts / len(df) * 100).round(2)
+        
+        print(f"    Class 0 (Goodware): {target_counts.get(0, 0):,} samples ({target_pcts.get(0, 0)}%)")
+        print(f"    Class 1 (Malware):  {target_counts.get(1, 0):,} samples ({target_pcts.get(1, 0)}%)")
+        
+        # Calculate imbalance ratio
+        if 0 in target_counts and 1 in target_counts:
+            ratio = max(target_counts) / min(target_counts)
+            print(f"    Imbalance ratio: {ratio:.2f}:1")
+        
+        return target_counts
     else:
-        print(f"  - No highly correlated pairs (>0.95) found")
-else:
-    print(f"  - Insufficient numeric features for correlation analysis")
+        print("    WARNING: 'Label' column not found!")
+        return None
 
-# STEP 9: Train/Test Split
-print("\n[STEP 9] Creating train/test split (80/20)...")
-X = df.drop('Label', axis=1)
-y = df['Label']
+def analyze_missing_data(df):
+    """Analyze missing data"""
+    print("\n[3] Missing Data Analysis:")
+    
+    missing = df.isnull().sum()
+    missing_pct = (missing / len(df) * 100).round(2)
+    
+    if missing.sum() == 0:
+        print("    ✓ No missing values detected!")
+    else:
+        missing_cols = missing[missing > 0].sort_values(ascending=False)
+        print(f"    Total missing values: {missing.sum():,}")
+        print("\n    Columns with missing values:")
+        for col in missing_cols.index[:10]:
+            print(f"      - {col}: {missing[col]:,} ({missing_pct[col]}%)")
+    
+    return missing
 
-# Stratified split with random_state=42
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
-)
+def analyze_data_types(df):
+    """Analyze data types"""
+    print("\n[4] Data Types:")
+    
+    dtype_counts = df.dtypes.value_counts()
+    for dtype, count in dtype_counts.items():
+        print(f"    {dtype}: {count} columns")
+    
+    # Separate numeric and categorical
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+    
+    print(f"\n    Numeric features: {len(numeric_cols)}")
+    print(f"    Categorical features: {len(categorical_cols)}")
+    
+    return numeric_cols, categorical_cols
 
-print(f"  - Training set: {len(X_train)} samples ({len(X_train)/len(X)*100:.1f}%)")
-print(f"    * Class 0: {(y_train == 0).sum()} ({(y_train == 0).sum()/len(y_train)*100:.2f}%)")
-print(f"    * Class 1: {(y_train == 1).sum()} ({(y_train == 1).sum()/len(y_train)*100:.2f}%)")
-print(f"  - Test set: {len(X_test)} samples ({len(X_test)/len(X)*100:.1f}%)")
-print(f"    * Class 0: {(y_test == 0).sum()} ({(y_test == 0).sum()/len(y_test)*100:.2f}%)")
-print(f"    * Class 1: {(y_test == 1).sum()} ({(y_test == 1).sum()/len(y_test)*100:.2f}%)")
+def analyze_duplicates(df):
+    """Check for duplicate rows"""
+    print("\n[5] Duplicate Analysis:")
+    
+    duplicates = df.duplicated().sum()
+    dup_pct = (duplicates / len(df) * 100).round(2)
+    
+    print(f"    Duplicate rows: {duplicates:,} ({dup_pct}%)")
+    
+    return duplicates
 
-# STEP 10: Save splits
-print("\n[STEP 10] Saving train/test splits to CSV...")
-X_train.to_csv(output_dir / "X_train.csv", index=False)
-X_test.to_csv(output_dir / "X_test.csv", index=False)
-y_train.to_csv(output_dir / "y_train.csv", index=False)
-y_test.to_csv(output_dir / "y_test.csv", index=False)
-print(f"  - Files saved to: {output_dir}")
+def create_visualizations(df, output_dir):
+    """Create and save visualizations"""
+    print("\n[6] Generating Visualizations:")
+    
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 1. Class Distribution
+    if 'Label' in df.columns:
+        plt.figure(figsize=(10, 6))
+        
+        counts = df['Label'].value_counts().sort_index()
+        labels = ['Goodware (0)', 'Malware (1)']
+        colors = ['#2ecc71', '#e74c3c']
+        
+        bars = plt.bar(labels, counts.values, color=colors, alpha=0.7, edgecolor='black')
+        
+        # Add value labels on bars
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{int(height):,}\n({height/len(df)*100:.1f}%)',
+                    ha='center', va='bottom', fontsize=12, fontweight='bold')
+        
+        plt.title('Class Distribution: Goodware vs Malware', fontsize=16, fontweight='bold')
+        plt.ylabel('Number of Samples', fontsize=12)
+        plt.xlabel('Class', fontsize=12)
+        plt.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+        
+        viz_path = output_dir / 'class_distribution.png'
+        plt.savefig(viz_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"    ✓ Saved: {viz_path}")
+    
+    # 2. Feature Distributions (first 6 numeric features)
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    if 'Label' in numeric_cols:
+        numeric_cols.remove('Label')
+    
+    if len(numeric_cols) >= 6:
+        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+        fig.suptitle('Distribution of First 6 Numeric Features', fontsize=16, fontweight='bold')
+        
+        for idx, col in enumerate(numeric_cols[:6]):
+            row = idx // 3
+            col_idx = idx % 3
+            
+            axes[row, col_idx].hist(df[col].dropna(), bins=30, color='steelblue', 
+                                   alpha=0.7, edgecolor='black')
+            axes[row, col_idx].set_title(col, fontweight='bold')
+            axes[row, col_idx].set_xlabel('Value')
+            axes[row, col_idx].set_ylabel('Frequency')
+            axes[row, col_idx].grid(alpha=0.3)
+        
+        plt.tight_layout()
+        viz_path = output_dir / 'feature_distributions.png'
+        plt.savefig(viz_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"    ✓ Saved: {viz_path}")
+    
+    # 3. Correlation Heatmap
+    if len(numeric_cols) > 0:
+        # Select subset for readability (max 20 features)
+        cols_for_corr = numeric_cols[:20]
+        corr_matrix = df[cols_for_corr].corr()
+        
+        plt.figure(figsize=(14, 12))
+        
+        mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
+        
+        sns.heatmap(corr_matrix, mask=mask, annot=False, cmap='coolwarm',
+                   center=0, square=True, linewidths=0.5,
+                   cbar_kws={"shrink": 0.8})
+        
+        plt.title('Feature Correlation Heatmap (Top 20 Features)', 
+                 fontsize=16, fontweight='bold', pad=20)
+        plt.xticks(rotation=45, ha='right')
+        plt.yticks(rotation=0)
+        plt.tight_layout()
+        
+        viz_path = output_dir / 'correlation_heatmap.png'
+        plt.savefig(viz_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"    ✓ Saved: {viz_path}")
 
-# STEP 11: Generate summary report
-print("\n[STEP 11] Generating EDA summary report...")
-summary = {
-    "dataset_info": {
-        "total_samples": int(len(df)),
-        "total_features": int(df.shape[1] - 1),
-        "features_numeric": len(numeric_cols),
-        "features_non_numeric": int(df.shape[1] - len(numeric_cols) - 1)
-    },
-    "class_distribution": {
-        "class_0_goodware": int(class_counts[0]),
-        "class_0_percent": float(class_pcts[0]),
-        "class_1_malware": int(class_counts[1]),
-        "class_1_percent": float(class_pcts[1])
-    },
-    "data_quality": {
-        "missing_values_total": int(missing.sum()),
-        "duplicate_rows": int(duplicates),
-        "duplicate_percent": float(dup_pct),
-        "constant_features": len(low_var) if 'low_var' in locals() else 0
-    },
-    "train_test_split": {
-        "random_seed": 42,
-        "train_samples": int(len(X_train)),
-        "train_percent": 80,
-        "test_samples": int(len(X_test)),
-        "test_percent": 20,
-        "train_class_0": int((y_train == 0).sum()),
-        "train_class_1": int((y_train == 1).sum()),
-        "test_class_0": int((y_test == 0).sum()),
-        "test_class_1": int((y_test == 1).sum())
-    },
-    "recommendations": [
-        "Remove constant features before modeling",
-        "Handle missing values in Identify column",
-        "Consider removing duplicate rows",
-        "Use stratified cross-validation (already done in train/test split)",
-        "Apply preprocessing (scaling, encoding) only on training data"
-    ]
-}
+def save_summary(df, output_file):
+    """Save EDA summary to text file"""
+    print(f"\n[7] Saving EDA Summary:")
+    
+    output_file = Path(output_file)
+    
+    with open(output_file, 'w') as f:
+        f.write("="*80 + "\n")
+        f.write("EXPLORATORY DATA ANALYSIS SUMMARY\n")
+        f.write("Brazilian Malware Dataset\n")
+        f.write("="*80 + "\n\n")
+        
+        # Dataset info
+        f.write("DATASET OVERVIEW:\n")
+        f.write(f"  Total Samples: {len(df):,}\n")
+        f.write(f"  Total Features: {df.shape[1] - 1}\n")
+        f.write(f"  Shape: {df.shape}\n\n")
+        
+        # Target distribution
+        if 'Label' in df.columns:
+            f.write("TARGET DISTRIBUTION:\n")
+            target_counts = df['Label'].value_counts().sort_index()
+            for label, count in target_counts.items():
+                pct = (count / len(df) * 100)
+                label_name = "Goodware" if label == 0 else "Malware"
+                f.write(f"  Class {label} ({label_name}): {count:,} ({pct:.2f}%)\n")
+            f.write("\n")
+        
+        # Missing data
+        missing = df.isnull().sum().sum()
+        f.write(f"MISSING DATA:\n")
+        f.write(f"  Total Missing Values: {missing:,}\n")
+        if missing > 0:
+            missing_cols = df.isnull().sum()[df.isnull().sum() > 0]
+            for col, count in missing_cols.items():
+                f.write(f"    {col}: {count:,}\n")
+        f.write("\n")
+        
+        # Duplicates
+        duplicates = df.duplicated().sum()
+        f.write(f"DUPLICATES:\n")
+        f.write(f"  Duplicate Rows: {duplicates:,}\n\n")
+        
+        # Data types
+        f.write("DATA TYPES:\n")
+        for dtype, count in df.dtypes.value_counts().items():
+            f.write(f"  {dtype}: {count} columns\n")
+        f.write("\n")
+        
+        # Feature names
+        f.write("FEATURE NAMES:\n")
+        for col in df.columns:
+            f.write(f"  - {col}\n")
+    
+    print(f"    ✓ Saved: {output_file}")
 
-with open(output_dir / "eda_summary.json", 'w') as f:
-    json.dump(summary, f, indent=2)
-print(f"  - Summary saved to: {output_dir / 'eda_summary.json'}")
+def main():
+    """Main execution"""
+    # Load data
+    df = load_data()
+    
+    # Analyze
+    analyze_target_distribution(df)
+    analyze_missing_data(df)
+    analyze_data_types(df)
+    analyze_duplicates(df)
+    
+    # Create visualizations
+    viz_dir = Path("data/visualizations")
+    create_visualizations(df, viz_dir)
+    
+    # Save summary
+    summary_file = Path("data/eda_summary.txt")
+    save_summary(df, summary_file)
+    
+    print("\n" + "="*80)
+    print("EDA COMPLETE!")
+    print("="*80)
+    print(f"\nOutputs:")
+    print(f"  - Visualizations: data/visualizations/")
+    print(f"  - Summary: data/eda_summary.txt")
+    print("\n")
 
-print("\n" + "="*80)
-print("EDA COMPLETE - All outputs ready for preprocessing!")
-print("="*80 + "\n")
+if __name__ == "__main__":
+    main()
