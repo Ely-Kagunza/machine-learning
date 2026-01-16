@@ -1,0 +1,235 @@
+"""
+Flask Web Application for Malware Detection
+Week 3: Deploy LightGBM model with REST API and web interface
+"""
+
+import os
+import pickle
+import numpy as np
+import pandas as pd
+from pathlib import Path
+from flask import Flask, render_template, request, jsonify
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+app = Flask(__name__)
+app.config['JSON_SORT_KEYS'] = False
+
+# Paths
+PROJECT_ROOT = Path(__file__).parent.parent.parent  # Goes up to workspace root
+MODEL_PATH = PROJECT_ROOT / 'models' / 'best_model.pkl'
+PREPROCESSOR_PATH = PROJECT_ROOT / 'models' / 'preprocessor.pkl'
+DATA_PATH = PROJECT_ROOT / 'data'
+
+# Model and preprocessor (loaded on startup)
+MODEL = None
+PREPROCESSOR = None
+FEATURE_NAMES = None
+CATEGORICAL_FEATURES = None
+NUMERIC_FEATURES = None
+
+# ============================================================================
+# LOAD MODEL AND PREPROCESSOR
+# ============================================================================
+def load_model_and_preprocessor():
+    """Load the trained model and preprocessing pipeline"""
+    global MODEL, PREPROCESSOR, FEATURE_NAMES, CATEGORICAL_FEATURES, NUMERIC_FEATURES
+    
+    try:
+        # Load best model (LightGBM)
+        with open(MODEL_PATH, 'rb') as f:
+            MODEL = pickle.load(f)
+        print(f"✓ Model loaded from {MODEL_PATH}")
+        
+        # Load preprocessor
+        with open(PREPROCESSOR_PATH, 'rb') as f:
+            preprocessor_data = pickle.load(f)
+        
+        PREPROCESSOR = preprocessor_data['preprocessor']
+        FEATURE_NAMES = preprocessor_data['feature_names']
+        CATEGORICAL_FEATURES = preprocessor_data['categorical_features']
+        NUMERIC_FEATURES = preprocessor_data['numeric_features']
+        
+        print(f"✓ Preprocessor loaded from {PREPROCESSOR_PATH}")
+        print(f"  - Features: {len(FEATURE_NAMES)}")
+        print(f"  - Categorical: {CATEGORICAL_FEATURES}")
+        print(f"  - Numeric: {NUMERIC_FEATURES}")
+        
+    except Exception as e:
+        print(f"✗ Error loading model/preprocessor: {e}")
+        raise
+
+# Load on app startup
+load_model_and_preprocessor()
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+def preprocess_input(data_dict):
+    """
+    Preprocess input data to match training format
+    
+    Args:
+        data_dict: Dictionary with feature names as keys
+    
+    Returns:
+        Preprocessed numpy array (1, n_features)
+    """
+    try:
+        # Create DataFrame with proper feature order
+        df = pd.DataFrame([data_dict], columns=FEATURE_NAMES)
+        
+        # Apply preprocessing
+        X_processed = PREPROCESSOR.transform(df)
+        
+        return X_processed
+    
+    except Exception as e:
+        raise ValueError(f"Preprocessing error: {e}")
+
+def make_prediction(X_processed):
+    """
+    Make prediction with the model
+    
+    Args:
+        X_processed: Preprocessed feature array (1, n_features)
+    
+    Returns:
+        Dictionary with prediction and probability
+    """
+    try:
+        # Get prediction
+        y_pred = MODEL.predict(X_processed)[0]
+        
+        # Get prediction probability
+        y_proba = MODEL.predict_proba(X_processed)[0]
+        
+        return {
+            'prediction': int(y_pred),
+            'probability_goodware': float(y_proba[0]),
+            'probability_malware': float(y_proba[1]),
+            'confidence': float(max(y_proba)) * 100
+        }
+    
+    except Exception as e:
+        raise ValueError(f"Prediction error: {e}")
+
+# ============================================================================
+# FLASK ROUTES
+# ============================================================================
+
+@app.route('/')
+def home():
+    """Render home page with input form"""
+    return render_template('index.html', 
+                         features=FEATURE_NAMES,
+                         numeric_features=NUMERIC_FEATURES,
+                         categorical_features=CATEGORICAL_FEATURES)
+
+@app.route('/api/predict', methods=['POST'])
+def predict():
+    """
+    API endpoint for predictions
+    Expects JSON with feature values
+    """
+    try:
+        # Get JSON data
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Validate required features
+        missing_features = [f for f in FEATURE_NAMES if f not in data]
+        if missing_features:
+            return jsonify({'error': f'Missing features: {missing_features}'}), 400
+        
+        # Extract only required features in correct order
+        input_data = {f: data[f] for f in FEATURE_NAMES}
+        
+        # Preprocess
+        X_processed = preprocess_input(input_data)
+        
+        # Make prediction
+        result = make_prediction(X_processed)
+        
+        # Interpret result
+        if result['prediction'] == 0:
+            result['classification'] = 'GOODWARE ✓'
+            result['status'] = 'Safe'
+            result['color'] = 'success'
+        else:
+            result['classification'] = 'MALWARE ⚠️'
+            result['status'] = 'Dangerous'
+            result['color'] = 'danger'
+        
+        return jsonify(result), 200
+    
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+@app.route('/api/features', methods=['GET'])
+def get_features():
+    """Get feature information"""
+    return jsonify({
+        'total_features': len(FEATURE_NAMES),
+        'numeric_features': NUMERIC_FEATURES,
+        'categorical_features': CATEGORICAL_FEATURES,
+        'all_features': FEATURE_NAMES
+    }), 200
+
+@app.route('/api/model-info', methods=['GET'])
+def model_info():
+    """Get model information"""
+    return jsonify({
+        'model_type': 'LightGBM',
+        'cv_auc': 0.9957,
+        'test_auc': 0.8678,
+        'test_accuracy': 0.9965,
+        'features': len(FEATURE_NAMES),
+        'status': 'Production Ready'
+    }), 200
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'model_loaded': MODEL is not None,
+        'preprocessor_loaded': PREPROCESSOR is not None
+    }), 200
+
+# ============================================================================
+# ERROR HANDLERS
+# ============================================================================
+
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors"""
+    return jsonify({'error': 'Endpoint not found'}), 404
+
+@app.errorhandler(500)
+def server_error(error):
+    """Handle 500 errors"""
+    return jsonify({'error': 'Internal server error'}), 500
+
+# ============================================================================
+# MAIN
+# ============================================================================
+
+if __name__ == '__main__':
+    print("\n" + "="*80)
+    print("MALWARE DETECTION FLASK WEB APP - WEEK 3")
+    print("="*80)
+    print(f"Model: LightGBM")
+    print(f"CV AUC: 0.9957")
+    print(f"Status: Ready for predictions")
+    print("="*80)
+    print("\nStarting Flask app on http://127.0.0.1:5000")
+    print("Press CTRL+C to stop the server\n")
+    
+    app.run(debug=True, host='127.0.0.1', port=5000)

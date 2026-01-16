@@ -1,0 +1,40 @@
+# Create .gitignore
+cat > .gitignore << 'EOF'
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Data (if files are too large)
+*.csv
+*.pkl
+*.joblib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model files (if too large)
+models/*.pkl
+models/*.h5
+models/*.pt
+EOF
+
+git add .gitignore
