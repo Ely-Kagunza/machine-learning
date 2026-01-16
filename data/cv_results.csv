@@ -1,0 +1,8 @@
+Model,CV_AUC_Mean,CV_AUC_Std,CV_Accuracy_Mean,CV_Accuracy_Std,Train_Time_Sec
+Logistic Regression,0.9621,0.0385,0.9963,0.0006,5.7
+Decision Tree,0.8582,0.0402,0.9972,0.0013,2.8
+Random Forest,0.9856,0.0257,0.9982,0.0007,3.9
+Neural Network (MLP),0.4999,0.0003,0.9954,0.0002,2.7
+XGBoost,0.9951,0.0116,0.9983,0.0008,2.5
+LightGBM,0.9957,0.0069,0.9981,0.0009,5.6
+Gradient Boosting,0.9716,0.0506,0.9979,0.0008,31.8

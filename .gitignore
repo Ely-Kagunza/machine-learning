@@ -1,5 +1,3 @@
-# Create .gitignore
-cat > .gitignore << 'EOF'
 # Python
 __pycache__/
 *.py[cod]
@@ -9,6 +7,7 @@ __pycache__/
 env/
 venv/
 ENV/
+.venv/
 *.egg-info/
 dist/
 build/
@@ -17,12 +16,7 @@ build/
 .ipynb_checkpoints/
 *.ipynb
 
-# Data (if files are too large)
-*.csv
-*.pkl
-*.joblib
-
-# IDE
+# IDE / Editor
 .vscode/
 .idea/
 *.swp
@@ -31,10 +25,11 @@ build/
 .DS_Store
 Thumbs.db
 
-# Model files (if too large)
-models/*.pkl
-models/*.h5
-models/*.pt
-EOF
+# Data (uncomment to ignore large raw files)
+# *.csv
+# *.pkl
+# *.joblib
 
-git add .gitignore
+# Models to keep (ensure they are tracked)
+!models/best_model.pkl
+!models/preprocessor.pkl
