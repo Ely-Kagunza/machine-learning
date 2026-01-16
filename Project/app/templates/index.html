@@ -82,15 +82,23 @@
                 <!-- Sample Data Section -->
                 <div class="card mt-4 shadow-sm">
                     <div class="card-header bg-info text-white">
-                        <h5 class="mb-0">💡 Sample Data</h5>
+                        <h5 class="mb-0">💡 Load Sample Data</h5>
                     </div>
                     <div class="card-body">
-                        <p class="mb-2"><strong>Load sample goodware features:</strong></p>
-                        <button type="button" class="btn btn-sm btn-outline-info" id="load-sample-btn">
-                            Load Sample
-                        </button>
-                        <p class="text-muted mt-2 mb-0">
-                            <small>Click to auto-fill form with example values for testing.</small>
+                        <p class="mb-3"><strong>Test with pre-loaded samples:</strong></p>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-success" id="load-goodware-btn">
+                                ✓ Load Goodware Sample (Mean Values)
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" id="load-malware-btn">
+                                ⚠️ Load Malware Sample (Mean Values)
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" id="load-random-btn">
+                                🎲 Load Random Goodware Sample
+                            </button>
+                        </div>
+                        <p class="text-muted mt-3 mb-0">
+                            <small>Click any button to auto-fill the form with real training data for testing.</small>
                         </p>
                     </div>
                 </div>

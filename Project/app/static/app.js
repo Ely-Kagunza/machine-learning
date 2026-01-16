@@ -5,34 +5,6 @@ let features = [];
 let numericFeatures = [];
 let categoricalFeatures = [];
 
-// Sample data for testing
-const SAMPLE_GOODWARE = {
-    'API_Count': 145,
-    'String_Count': 89,
-    'Entropy': 6.2,
-    'Legitimate_API': 1,
-    'Suspicious_String': 0,
-    'Packed': 0,
-    'Debug_Info': 1,
-    'Import_Table': 1,
-    'Export_Table': 0,
-    'Resource_Section': 1,
-    'Text_Section': 1,
-    'Data_Section': 1,
-    'Section_Count': 5,
-    'Virtual_Size': 245760,
-    'Raw_Size': 258048,
-    'Timestamp': 1356998400,
-    'Machine_Type': 332,
-    'Subsystem': 3,
-    'Characteristics': 258,
-    'Header_Size': 512,
-    'Code_Section_Entropy': 5.8,
-    'Data_Section_Entropy': 4.2,
-    'Imported_DLLs': 8,
-    'Exported_Functions': 0
-};
-
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Loading malware detection app...');
@@ -42,7 +14,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Attach event listeners
     document.getElementById('prediction-form').addEventListener('submit', handlePrediction);
-    document.getElementById('load-sample-btn').addEventListener('click', loadSampleData);
+    document.getElementById('load-goodware-btn').addEventListener('click', () => loadSampleData('goodware'));
+    document.getElementById('load-malware-btn').addEventListener('click', () => loadSampleData('malware'));
+    document.getElementById('load-random-btn').addEventListener('click', () => loadSampleData('random'));
 });
 
 // Fetch features from API
@@ -232,17 +206,48 @@ function displayResult(result) {
 }
 
 // Load sample data
-function loadSampleData() {
-    console.log('Loading sample goodware data...');
+function loadSampleData(sampleType) {
+    console.log(`Loading ${sampleType} sample data...`);
     
-    for (let [key, value] of Object.entries(SAMPLE_GOODWARE)) {
-        const element = document.getElementById(key);
-        if (element) {
-            element.value = value;
-        }
-    }
+    // Show loading state
+    const btn = document.getElementById(`load-${sampleType}-btn`);
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
     
-    showAlert('✓ Sample goodware data loaded', 'info');
+    // Fetch sample data from API
+    fetch(`/api/sample/${sampleType}`)
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to load sample');
+                });
+            }
+            return response.json();
+        })
+        .then(result => {
+            console.log('Sample data loaded:', result);
+            
+            // Fill form with sample data
+            const sample = result.sample;
+            for (let [key, value] of Object.entries(sample)) {
+                const element = document.getElementById(key);
+                if (element) {
+                    element.value = value;
+                }
+            }
+            
+            // Show success message with sample name
+            showAlert(`✓ ${result.sample_name} loaded (${result.features} features)`, 'success');
+        })
+        .catch(error => {
+            console.error('Error loading sample:', error);
+            showAlert(`❌ ${error.message}`, 'danger');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
 }
 
 // Show alert message

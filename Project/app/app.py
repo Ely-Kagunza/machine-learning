@@ -10,6 +10,7 @@ import pandas as pd
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+import random
 
 # ============================================================================
 # CONFIGURATION
@@ -63,6 +64,51 @@ def load_model_and_preprocessor():
 
 # Load on app startup
 load_model_and_preprocessor()
+
+# ============================================================================
+# SAMPLE DATA FUNCTIONS
+# ============================================================================
+def load_sample_data_from_file(sample_type='goodware'):
+    """
+    Load real sample data from training set
+    
+    Args:
+        sample_type: 'goodware' (mean), 'malware' (mean), or 'random' (random goodware)
+    
+    Returns:
+        Dictionary with feature values
+    """
+    try:
+        X_train = pd.read_csv(DATA_PATH / 'X_train_processed.csv')
+        y_train = pd.read_csv(DATA_PATH / 'y_train_processed.csv').squeeze()
+        
+        if sample_type == 'goodware':
+            # Mean values of goodware (class 0)
+            goodware_samples = X_train[y_train == 0]
+            sample = goodware_samples.mean().to_dict()
+            sample_name = "Mean Goodware Sample"
+            
+        elif sample_type == 'malware':
+            # Mean values of malware (class 1)
+            malware_samples = X_train[y_train == 1]
+            sample = malware_samples.mean().to_dict()
+            sample_name = "Mean Malware Sample"
+            
+        elif sample_type == 'random':
+            # Random goodware sample
+            goodware_indices = y_train[y_train == 0].index.tolist()
+            random_idx = random.choice(goodware_indices)
+            sample = X_train.loc[random_idx].to_dict()
+            sample_name = f"Random Goodware Sample #{random_idx}"
+        
+        return {
+            'sample': {k: float(v) for k, v in sample.items()},
+            'sample_name': sample_name,
+            'features': len(sample)
+        }
+    
+    except Exception as e:
+        return {'error': f'Error loading sample data: {str(e)}'}
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -181,6 +227,22 @@ def get_features():
         'categorical_features': CATEGORICAL_FEATURES,
         'all_features': FEATURE_NAMES
     }), 200
+
+@app.route('/api/sample/<sample_type>', methods=['GET'])
+def get_sample(sample_type):
+    """
+    Get sample data for testing
+    sample_type: goodware, malware, or random
+    """
+    if sample_type not in ['goodware', 'malware', 'random']:
+        return jsonify({'error': 'Invalid sample type. Use: goodware, malware, or random'}), 400
+    
+    result = load_sample_data_from_file(sample_type)
+    
+    if 'error' in result:
+        return jsonify(result), 500
+    
+    return jsonify(result), 200
 
 @app.route('/api/model-info', methods=['GET'])
 def model_info():
