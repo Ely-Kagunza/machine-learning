@@ -92,7 +92,7 @@ function createInputField(featureName, type = 'number') {
                 id="${featureName}" 
                 name="${featureName}" 
                 placeholder="Enter value"
-                required
+                step="any"
             >
         </div>
     `;
@@ -103,16 +103,14 @@ function createSelectField(featureName) {
     return `
         <div class="form-group">
             <label for="${featureName}" class="form-label">${featureName}</label>
-            <select 
+            <input 
+                type="number" 
                 class="form-control" 
                 id="${featureName}" 
-                name="${featureName}"
-                required
+                name="${featureName}" 
+                placeholder="Enter numeric value"
+                step="1"
             >
-                <option value="">-- Select --</option>
-                <option value="0">0</option>
-                <option value="1">1</option>
-            </select>
         </div>
     `;
 }
@@ -133,6 +131,19 @@ function handlePrediction(event) {
     // Collect form data
     const formData = new FormData(document.getElementById('prediction-form'));
     const inputData = Object.fromEntries(formData);
+    
+    console.log('Form data collected:', inputData);
+    
+    // Validate all required features are present
+    const missingFeatures = features.filter(f => !(f in inputData));
+    if (missingFeatures.length > 0) {
+        console.warn('Missing features:', missingFeatures);
+        showAlert(`❌ Please fill in all fields. Missing: ${missingFeatures.join(', ')}`, 'danger');
+        submitBtn.disabled = false;
+        submitText.textContent = '🔬 Analyze File';
+        spinner.style.display = 'none';
+        return;
+    }
     
     // Convert numeric strings to numbers
     for (let key in inputData) {
@@ -218,31 +229,62 @@ function loadSampleData(sampleType) {
     // Fetch sample data from API
     fetch(`/api/sample/${sampleType}`)
         .then(response => {
+            console.log('Response status:', response.status);
             if (!response.ok) {
                 return response.json().then(data => {
-                    throw new Error(data.error || 'Failed to load sample');
+                    throw new Error(data.error || `Failed to load sample (Status: ${response.status})`);
                 });
             }
             return response.json();
         })
         .then(result => {
-            console.log('Sample data loaded:', result);
+            console.log('Sample data received:', result);
+            console.log('Sample keys:', Object.keys(result.sample));
             
             // Fill form with sample data
             const sample = result.sample;
+            let filledCount = 0;
+            let notFoundCount = 0;
+            
             for (let [key, value] of Object.entries(sample)) {
                 const element = document.getElementById(key);
                 if (element) {
-                    element.value = value;
+                    // Handle INPUT elements (all fields are now number inputs)
+                    if (element.tagName === 'INPUT') {
+                        if (element.type === 'number') {
+                            // For integer fields (categorical), don't add decimals
+                            if (categoricalFeatures.includes(key)) {
+                                element.value = parseInt(value) || 0;
+                            } else {
+                                // For numeric fields, keep 2 decimal places
+                                element.value = parseFloat(value).toFixed(2);
+                            }
+                            console.log(`Filled INPUT ${key}: ${element.value}`);
+                        } else {
+                            element.value = value;
+                        }
+                    }
+                    filledCount++;
+                } else {
+                    notFoundCount++;
+                    console.warn(`Element not found for: ${key}`);
                 }
             }
             
+            console.log(`Filled ${filledCount} fields, ${notFoundCount} not found`);
+            
+            // Scroll to form
+            const formContainer = document.getElementById('features-container');
+            if (formContainer) {
+                formContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            
             // Show success message with sample name
-            showAlert(`✓ ${result.sample_name} loaded (${result.features} features)`, 'success');
+            showAlert(`✓ ${result.sample_name} loaded (${filledCount}/${result.features} fields filled)`, 'success');
         })
         .catch(error => {
             console.error('Error loading sample:', error);
-            showAlert(`❌ ${error.message}`, 'danger');
+            showAlert(`❌ Error: ${error.message}`, 'danger');
         })
         .finally(() => {
             btn.disabled = false;

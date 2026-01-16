@@ -70,7 +70,7 @@ load_model_and_preprocessor()
 # ============================================================================
 def load_sample_data_from_file(sample_type='goodware'):
     """
-    Load real sample data from training set
+    Load real sample data from training set (RAW, before preprocessing)
     
     Args:
         sample_type: 'goodware' (mean), 'malware' (mean), or 'random' (random goodware)
@@ -79,32 +79,92 @@ def load_sample_data_from_file(sample_type='goodware'):
         Dictionary with feature values
     """
     try:
-        X_train = pd.read_csv(DATA_PATH / 'X_train_processed.csv')
-        y_train = pd.read_csv(DATA_PATH / 'y_train_processed.csv').squeeze()
+        # Load RAW data (before preprocessing) so it can be preprocessed correctly
+        X_train = pd.read_csv(DATA_PATH / 'X_train.csv')
+        y_train = pd.read_csv(DATA_PATH / 'y_train.csv').squeeze()
+        
+        # Select only the features that the model expects
+        # First, filter to only columns that exist in FEATURE_NAMES
+        available_features = [col for col in FEATURE_NAMES if col in X_train.columns]
+        X_train_filtered = X_train[available_features].copy()
+        
+        # Convert categorical features to numeric (they might be stored as objects/strings)
+        for cat_feature in CATEGORICAL_FEATURES:
+            if cat_feature in X_train_filtered.columns:
+                X_train_filtered[cat_feature] = pd.to_numeric(X_train_filtered[cat_feature], errors='coerce').fillna(0)
+        
+        # Separate numeric and categorical columns (after conversion)
+        numeric_cols = X_train_filtered.select_dtypes(include=[np.number]).columns.tolist()
+        X_train_numeric = X_train_filtered[numeric_cols]
         
         if sample_type == 'goodware':
             # Mean values of goodware (class 0)
-            goodware_samples = X_train[y_train == 0]
+            goodware_mask = y_train == 0
+            goodware_samples = X_train_numeric[goodware_mask]
+            # Use mean for numeric features
             sample = goodware_samples.mean().to_dict()
+            # For categorical features, use mode (most common value) instead of mean
+            for cat_feature in CATEGORICAL_FEATURES:
+                if cat_feature in goodware_samples.columns:
+                    mode_val = goodware_samples[cat_feature].mode()
+                    sample[cat_feature] = int(mode_val.iloc[0]) if len(mode_val) > 0 else 0
             sample_name = "Mean Goodware Sample"
             
         elif sample_type == 'malware':
             # Mean values of malware (class 1)
-            malware_samples = X_train[y_train == 1]
+            malware_mask = y_train == 1
+            malware_samples = X_train_numeric[malware_mask]
+            # Use mean for numeric features
             sample = malware_samples.mean().to_dict()
+            # For categorical features, use mode (most common value) instead of mean
+            for cat_feature in CATEGORICAL_FEATURES:
+                if cat_feature in malware_samples.columns:
+                    mode_val = malware_samples[cat_feature].mode()
+                    sample[cat_feature] = int(mode_val.iloc[0]) if len(mode_val) > 0 else 0
             sample_name = "Mean Malware Sample"
             
         elif sample_type == 'random':
             # Random goodware sample
             goodware_indices = y_train[y_train == 0].index.tolist()
             random_idx = random.choice(goodware_indices)
-            sample = X_train.loc[random_idx].to_dict()
+            sample = X_train_numeric.loc[random_idx].to_dict()
+            # For categorical features, convert to int
+            for cat_feature in CATEGORICAL_FEATURES:
+                if cat_feature in sample:
+                    sample[cat_feature] = int(sample[cat_feature])
             sample_name = f"Random Goodware Sample #{random_idx}"
         
+        # Ensure all required features are present (fill missing with 0)
+        for feature in FEATURE_NAMES:
+            if feature not in sample:
+                sample[feature] = 0.0
+        
+        # Debug: Print what we got
+        print(f"\n[DEBUG] Sample type: {sample_type}")
+        print(f"[DEBUG] Features in sample before conversion: {list(sample.keys())}")
+        print(f"[DEBUG] Categorical features: {CATEGORICAL_FEATURES}")
+        
+        # Convert all values to proper numeric format for JSON serialization
+        result_sample = {}
+        for feature in FEATURE_NAMES:
+            value = sample.get(feature, 0.0)
+            try:
+                # All features should be converted to proper numeric format
+                if feature in CATEGORICAL_FEATURES:
+                    # Categorical features must be integers
+                    result_sample[feature] = int(round(float(value)))
+                else:
+                    # Numeric features as floats
+                    result_sample[feature] = float(value)
+            except (ValueError, TypeError):
+                result_sample[feature] = 0
+        
+        print(f"[DEBUG] Categorical values (final): {[(k, result_sample[k]) for k in CATEGORICAL_FEATURES if k in result_sample]}\n")
+        
         return {
-            'sample': {k: float(v) for k, v in sample.items()},
+            'sample': result_sample,
             'sample_name': sample_name,
-            'features': len(sample)
+            'features': len(FEATURE_NAMES)
         }
     
     except Exception as e:
@@ -127,8 +187,14 @@ def preprocess_input(data_dict):
         # Create DataFrame with proper feature order
         df = pd.DataFrame([data_dict], columns=FEATURE_NAMES)
         
+        print(f"[DEBUG] DataFrame shape: {df.shape}")
+        print(f"[DEBUG] DataFrame columns: {list(df.columns)}")
+        print(f"[DEBUG] First few values: {df.iloc[0, :5].to_dict()}")
+        
         # Apply preprocessing
         X_processed = PREPROCESSOR.transform(df)
+        
+        print(f"[DEBUG] Processed shape: {X_processed.shape}")
         
         return X_processed
     
