@@ -81,9 +81,10 @@ def load_sample_data_from_file(sample_type='goodware'):
         Dictionary with feature values
     """
     try:
-        # Load RAW data (before preprocessing) so it can be preprocessed correctly
-        X_train = pd.read_csv(DATA_PATH / 'X_train.csv')
-        y_train = pd.read_csv(DATA_PATH / 'y_train.csv').squeeze()
+        # Load RAW data in chunks to avoid memory issues on free tier
+        # Read only first 1000 rows for sampling to save memory
+        X_train = pd.read_csv(DATA_PATH / 'X_train.csv', nrows=1000)
+        y_train = pd.read_csv(DATA_PATH / 'y_train.csv', nrows=1000).squeeze()
         
         # Select only the features that the model expects
         # First, filter to only columns that exist in FEATURE_NAMES

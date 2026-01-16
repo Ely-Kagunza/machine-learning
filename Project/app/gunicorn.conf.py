@@ -12,6 +12,10 @@ worker_class = 'sync'
 worker_connections = 100
 timeout = 120
 keepalive = 5
+graceful_timeout = 30
+
+# Preload app before forking workers (saves memory)
+preload_app = True
 
 # Memory optimization
 max_requests = 100  # Restart workers after 100 requests to prevent memory leaks
