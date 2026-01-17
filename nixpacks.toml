@@ -1,16 +1,4 @@
 providers = ["python"]
 
-[[build.phases]]
-id = "setup"
-dependsOn = []
-
-[[build.phases]]
-id = "install"
-dependsOn = ["setup"]
-cmds = ["pip install -r requirements.txt"]
-
 [build]
 cwd = "Project/app"
-
-[start]
-cmd = "gunicorn --config gunicorn.conf.py app:app"
