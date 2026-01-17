@@ -16,7 +16,7 @@ keepalive = 5
 graceful_timeout = 30
 
 # Preload app before forking workers (saves memory)
-preload_app = True
+preload_app = False
 
 # Memory optimization
 max_requests = 100  # Restart workers after 100 requests to prevent memory leaks
