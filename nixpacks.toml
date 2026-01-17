@@ -1,11 +1,13 @@
+providers = ["python"]
+
 [phases.setup]
-providers = ["python311"]
+nixPkgs = ["python311"]
 
 [phases.install]
 cmds = [
   "cd Project/app",
-  "python3 -m pip install --upgrade pip",
-  "python3 -m pip install -r requirements.txt"
+  "pip install --upgrade pip",
+  "pip install -r requirements.txt"
 ]
 
 [start]
