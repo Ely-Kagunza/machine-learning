@@ -1,10 +1,10 @@
+[phases.setup]
 providers = ["python"]
 
-[phases.setup]
-nixPkgs = ["python311"]
-
 [phases.install]
-cmds = ["cd Project/app", "python3 -m pip install --upgrade pip", "python3 -m pip install -r requirements.txt"]
+dependsOn = ["setup"]
+paths = ["Project/app"]
 
 [start]
-cmd = "cd Project/app && gunicorn --config gunicorn.conf.py app:app"
+cmd = "gunicorn --config gunicorn.conf.py app:app"
+workDir = "Project/app"
