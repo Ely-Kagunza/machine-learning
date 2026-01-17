@@ -2,3 +2,7 @@ providers = ["python"]
 
 [build]
 cwd = "Project/app"
+
+[[build.phases]]
+id = "install"
+cmds = ["pip install -r requirements.txt"]
