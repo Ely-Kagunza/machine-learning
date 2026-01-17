@@ -293,7 +293,15 @@ def get_sample(sample_type):
     Get sample data for testing
     sample_type: goodware, malware, or random
     """
-    return jsonify({'error': 'Sample data loading temporarily disabled. Use the form to test predictions.'}), 501
+    if sample_type not in ['goodware', 'malware', 'random']:
+        return jsonify({'error': 'Invalid sample type. Use: goodware, malware, or random'}), 400
+    
+    result = load_sample_data_from_file(sample_type)
+    
+    if 'error' in result:
+        return jsonify(result), 500
+    
+    return jsonify(result), 200
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
