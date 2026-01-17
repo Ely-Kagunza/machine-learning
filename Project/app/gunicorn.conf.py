@@ -2,8 +2,9 @@
 import multiprocessing
 import os
 
-# Server socket
-bind = f"0.0.0.0:{os.getenv('PORT', '10000')}"
+# Server socket - Railway sets PORT env var
+port = os.getenv('PORT', '10000')
+bind = f"0.0.0.0:{port}"
 backlog = 2048
 
 # Worker processes
@@ -26,4 +27,3 @@ worker_tmp_dir = '/dev/shm'  # Use RAM disk for worker temp files
 accesslog = '-'
 errorlog = '-'
 loglevel = 'info'
-
