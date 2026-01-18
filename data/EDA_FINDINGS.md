@@ -169,17 +169,6 @@ The following files have been generated and saved to `data/`:
 
 ---
 
-## Next Steps (Week 1, Days 4-5)
-
-1. ✓ EDA Complete - Data quality assessed
-2. Next: Build preprocessing pipeline
-3. Then: Apply to both train/test splits
-4. Finally: Generate clean data for model training
-
-**Status**: Ready to proceed to preprocessing and modeling phases.
-
----
-
 *Generated: Brazilian Malware Dataset EDA*  
 *Dataset Size: 21,214 samples × 31 features*  
 *Split: 80% training (16,971) / 20% testing (4,243)*  

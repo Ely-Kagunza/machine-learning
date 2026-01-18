@@ -255,7 +255,7 @@ python -m flask --app app run --port 5001
 - [scikit-learn](https://scikit-learn.org/)
 
 ## Author
-Machine Learning Team - Week 3 Development
+Machine Learning Team
 
 ## License
 Proprietary - Brazilian Malware Dataset Project
